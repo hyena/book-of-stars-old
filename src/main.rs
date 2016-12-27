@@ -128,6 +128,7 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) ->
         return Err(status::Custom(Status::Forbidden,
                                   "Bad verification token."));
     }
+    println!("{} /quoth {}", slack_data.user_name, slack_data.text);
     let message_timestamp = match ARCHIVE_LINK_RE.captures(&slack_data.text) {
         Some(caps) => {
             format!("{}.{}", caps.name("s").unwrap(), caps.name("us").unwrap())
@@ -164,9 +165,9 @@ fn main() {
         let rx = STAR_WORKER_CHANNEL.1.lock().unwrap();
         loop {
             let star_request_data = rx.recv().unwrap();
-            println!("Got this timestamp {}", star_request_data.message_timestamp);
-            let msg: Message;
-            match history(&client, &CONFIG.slack_token, &star_request_data.channel_id,
+
+            // Attempt to retrieve the message.... This is optional.
+            let msg = match history(&client, &CONFIG.slack_token, &star_request_data.channel_id,
                           Some(&star_request_data.message_timestamp),
                           Some(&star_request_data.message_timestamp),
                           Some(true),
@@ -174,41 +175,39 @@ fn main() {
             {
                 Ok(mut history_response) => {
                     if history_response.messages.len() != 1 {
-                        send_slack_response(&client, &star_request_data.response_url,
-                                            "Couldn't retrieve that message.");
-                        continue;
+                        // Likely just beyond the end.
+                        None
+                    } else {
+                        Some(history_response.messages.remove(0))
                     }
-                    msg = history_response.messages.remove(0);
                 }
                 Err(e) => {
-                    send_slack_response(&client, &star_request_data.response_url,
-                                        "Couldn't retrieve that message.");
-                    continue;// TODO: Return an error response here.
+                    // Optimistically continue, but we probably will fail when starring anyway.
+                    None
                 }
             };
 
-            println!("Message: {:?}", msg);
-            match msg {
-                Message::Standard {text: Some(ref text), .. } => {
-                    let res_text = match add(&client, &CONFIG.slack_token, None, None,
-                                             Some(&star_request_data.channel_id),
-                                             Some(&star_request_data.message_timestamp))
-                    {
-                        Ok(_) => format!("Penned \"{}\" into the book of stars.... 🐼", &text),
-                        // Already being starred is okay. Probably needs a safer check.
-                        Err(Error::Api(ref s)) if s.contains("already_starred") =>
-                            format!("Penned \"{}\" into the book of stars.... 🐼", &text),
-                        Err(e) => {
-                            println!("Error adding a star: {:?}", e);
-                            format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
-                                    "\nBother perhaps the foolish sqrl? 🐿"), &text)
-                        },
-                    };
-                    send_slack_response(&client, &star_request_data.response_url, &res_text);
+            let msg_text = match msg {
+                Some(Message::Standard {text: Some(ref text), .. }) => {
+                    format!("\"{}\"", &text)
                 },
-                _ => send_slack_response(&client, &star_request_data.response_url,
-                                         "Unexpected message."),
-            }
+                Some(_) | None => String::from("it")
+            };
+            let res_text = match add(&client, &CONFIG.slack_token, None, None,
+                                     Some(&star_request_data.channel_id),
+                                     Some(&star_request_data.message_timestamp))
+            {
+                    Ok(_) => format!("Penned \"{}\" into the book of stars.... ", msg_text),
+                    // Already being starred is okay. Probably needs a safer check.
+                    Err(Error::Api(ref s)) if s.contains("already_starred") =>
+                        format!("Penned \"{}\" into the book of stars.... ", msg_text),
+                    Err(e) => {
+                        println!("Error adding a star: {:?}", e);
+                        format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
+                                "\nBother perhaps the foolish sqrl? 🐿"), msg_text)
+                    },
+            };
+            send_slack_response(&client, &star_request_data.response_url, &res_text);
         }
     });
     rocket::ignite().mount("/", routes![star]).launch();
