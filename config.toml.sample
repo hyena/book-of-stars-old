@@ -1,5 +1,3 @@
 # Copy this file to `config.toml` and fill in the fields.
-[book-of-stars]
-slack-token: XXXXXXX           # Your slack API token
-verification-token: XXXXXXXX   # Slack's verification token.
-
+slack-token = "XXXXXXX"           # Your slack API token
+verification-token = "XXXXXXXX"   # Slack's verification token.
