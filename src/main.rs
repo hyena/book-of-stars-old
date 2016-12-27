@@ -2,6 +2,7 @@
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
+extern crate hyper;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
@@ -10,12 +11,15 @@ extern crate rustc_serialize;
 extern crate slack_api;
 extern crate toml;
 
+use hyper::Client;
 use regex::Regex;
 use rocket::Outcome;
 use rocket::http::Status;
 use rocket::request;
 use rocket::request::{Form, FromRequest, Request};
 use rocket::response::status;
+use slack_api::Message;
+use slack_api::channels::history;
 
 use std::fs::File;
 use std::io::Read;
@@ -67,7 +71,6 @@ fn parse_config() -> Config {
     file.read_to_string(&mut config_toml)
             .unwrap_or_else(|err| panic!("Error while reading config.toml: [{}]", err));
 
-    println!("{}", config_toml);
     match toml::decode_str(&config_toml) {
         Some(config) => config,
         None => panic!("Error while deserializing config.toml.")
@@ -80,7 +83,6 @@ lazy_static! {
         // TODO: The mutex lock on this seems like a really wasteful overhead.
         (Mutex::new(tx), Mutex::new(rx))
     };
-    //#[derive(Debug)]
     static ref CONFIG: Config = parse_config();
 }
 
@@ -112,7 +114,7 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) ->
     }
     if slack_data.token != CONFIG.verification_token {
         return Err(status::Custom(Status::Forbidden,
-                                  "Bad token."));
+                                  "Bad verification token."));
     }
     let message_timestamp = match ARCHIVE_LINK_RE.captures(&slack_data.text) {
         Some(caps) => {
@@ -134,11 +136,27 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) ->
 }
 
 fn main() {
+    let client = Client::new();
     let child = thread::Builder::new().name("staring thread".to_string()).spawn(move || {
         let rx = STAR_WORKER_CHANNEL.1.lock().unwrap();
         loop {
             let star_request_data = rx.recv().unwrap();
             println!("Got this timestamp {}", star_request_data.message_timestamp);
+            let msg: Message;
+            match history(&client, &CONFIG.slack_token, &star_request_data.channel_id,
+                          Some(&star_request_data.message_timestamp),
+                          Some(&star_request_data.message_timestamp),
+                          Some(true),
+                          Some(1))
+            {
+                Ok(mut history_response) => {
+                    msg = history_response.messages.remove(0);
+                }
+                Err(e) => {
+                    continue;// TODO: Return an error response here.
+                }
+            };
+            println!("Message: {:?}", msg);
         }
     });
     rocket::ignite().mount("/", routes![star]).launch();

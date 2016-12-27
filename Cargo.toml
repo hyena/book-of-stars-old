@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["hyena <hyena@users.noreply.github.com>"]
 
 [dependencies]
+hyper = "0.9.14"
 lazy_static = "0.1.*"
 regex = "0.1"
 rocket = "0.1.2"
