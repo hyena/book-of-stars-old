@@ -197,13 +197,13 @@ fn main() {
                                      Some(&star_request_data.channel_id),
                                      Some(&star_request_data.message_timestamp))
             {
-                    Ok(_) => format!("Penned \"{}\" into the book of stars.... ", msg_text),
+                    Ok(_) => format!("Penned {} into the book of stars.... ", msg_text),
                     // Already being starred is okay. Probably needs a safer check.
                     Err(Error::Api(ref s)) if s.contains("already_starred") =>
-                        format!("Penned \"{}\" into the book of stars.... ", msg_text),
+                        format!("Penned {} into the book of stars.... ", msg_text),
                     Err(e) => {
                         println!("Error adding a star: {:?}", e);
-                        format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
+                        format!(concat!("Alack! Could not pen {} into the book of stars....",
                                 "\nBother perhaps the foolish sqrl? 🐿"), msg_text)
                     },
             };
