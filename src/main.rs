@@ -20,8 +20,10 @@ use rocket::request;
 use rocket::request::{Form, FromRequest, Request};
 use rocket::response::status;
 use rustc_serialize::json;
+use slack_api::Error;
 use slack_api::Message;
 use slack_api::channels::history;
+use slack_api::stars::add;
 
 use std::fs::File;
 use std::io::Read;
@@ -188,13 +190,22 @@ fn main() {
             println!("Message: {:?}", msg);
             match msg {
                 Message::Standard {text: Some(ref text), .. } => {
-                    send_slack_response(&client, &star_request_data.response_url,
-                        &format!("Penned \"{}\" into the book of stars.... 🐼", &text));
+                    let res_text = match add(&client, &CONFIG.slack_token, None, None,
+                                             Some(&star_request_data.channel_id),
+                                             Some(&star_request_data.message_timestamp))
+                    {
+                        Ok(_) => format!("Penned \"{}\" into the book of stars.... 🐼", &text),
+                        // Already being starred is okay.
+                        Err(Error::Api(ref s)) if s == "already_starred" =>
+                            format!("Penned \"{}\" into the book of stars.... 🐼", &text),
+                        _ => format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
+                                      "\nBother perhaps the foolish sqrl? 🐿"), &text),
+                    };
+                    send_slack_response(&client, &star_request_data.response_url, &res_text);
                 },
                 _ => send_slack_response(&client, &star_request_data.response_url,
                                          "Unexpected message."),
             }
-
         }
     });
     rocket::ignite().mount("/", routes![star]).launch();
