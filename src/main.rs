@@ -195,8 +195,8 @@ fn main() {
                                              Some(&star_request_data.message_timestamp))
                     {
                         Ok(_) => format!("Penned \"{}\" into the book of stars.... 🐼", &text),
-                        // Already being starred is okay.
-                        Err(Error::Api(ref s)) if s == "already_starred" =>
+                        // Already being starred is okay. Probably needs a safer check.
+                        Err(Error::Api(ref s)) if s.contains("already_starred") =>
                             format!("Penned \"{}\" into the book of stars.... 🐼", &text),
                         Err(e) => {
                             println!("Error adding a star: {:?}", e);
