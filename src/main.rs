@@ -12,7 +12,7 @@ use rocket::Outcome;
 use rocket::http::Status;
 use rocket::request;
 use rocket::request::{Form, FromRequest, Request};
-use rocket::response::Failure;
+use rocket::response::{Failure, status};
 
 use std::thread;
 use std::sync::{Arc, Mutex, RwLock, mpsc};
@@ -63,7 +63,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for WorkerChannel {
 }
 
 #[post("/starlord", data = "<slack_form>")]
-fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Result<(), Status> {
+fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Result<(), status::Custom<&str>> {
     let slack_data = slack_form.into_inner();
     lazy_static! {
         // Sample url:
@@ -77,7 +77,7 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Resu
             format!("{}.{}", caps.name("s").unwrap(), caps.name("us").unwrap())
         },
         None => {
-            return Err(Status::new(400, "Bad Request: Usage /quoth <link to message>"))
+            return Err(status::Custom(Status::BadRequest, "Bad Request: Usage /quoth <link to message>"));
         },
     };
     let star_request_data = StarRequestData {
