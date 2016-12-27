@@ -198,8 +198,11 @@ fn main() {
                         // Already being starred is okay.
                         Err(Error::Api(ref s)) if s == "already_starred" =>
                             format!("Penned \"{}\" into the book of stars.... 🐼", &text),
-                        _ => format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
-                                      "\nBother perhaps the foolish sqrl? 🐿"), &text),
+                        Err(e) => {
+                            println!("Error adding a star: {:?}", e);
+                            format!(concat!("Alack! Could not pen \"{}\" into the book of stars....",
+                                    "\nBother perhaps the foolish sqrl? 🐿"), &text)
+                        },
                     };
                     send_slack_response(&client, &star_request_data.response_url, &res_text);
                 },
