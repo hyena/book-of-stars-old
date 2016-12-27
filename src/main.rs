@@ -63,7 +63,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for WorkerChannel {
 }
 
 #[post("/starlord", data = "<slack_form>")]
-fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Result<(), Failure> {
+fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Result<(), Status> {
     let slack_data = slack_form.into_inner();
     lazy_static! {
         // Sample url:
@@ -77,7 +77,7 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) -> Resu
             format!("{}.{}", caps.name("s").unwrap(), caps.name("us").unwrap())
         },
         None => {
-            return Err(Failure(Status::new(400, "Bad Request: Usage /quoth <link to message>")))
+            return Err(Status::new(400, "Bad Request: Usage /quoth <link to message>"))
         },
     };
     let star_request_data = StarRequestData {
