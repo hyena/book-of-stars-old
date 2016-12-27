@@ -171,6 +171,11 @@ fn main() {
                           Some(1))
             {
                 Ok(mut history_response) => {
+                    if history_response.messages.len() != 1 {
+                        send_slack_response(&client, &star_request_data.response_url,
+                                            "Couldn't retrieve that message.");
+                        continue;
+                    }
                     msg = history_response.messages.remove(0);
                 }
                 Err(e) => {
