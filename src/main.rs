@@ -12,12 +12,14 @@ extern crate slack_api;
 extern crate toml;
 
 use hyper::Client;
+use hyper::header::ContentType;
 use regex::Regex;
 use rocket::Outcome;
 use rocket::http::Status;
 use rocket::request;
 use rocket::request::{Form, FromRequest, Request};
 use rocket::response::status;
+use rustc_serialize::json;
 use slack_api::Message;
 use slack_api::channels::history;
 
@@ -46,6 +48,14 @@ struct StarRequestData {
     message_timestamp: String,
     channel_id: String,
     response_url: String,
+}
+
+/// Data that we will JSON encode to send back in response to a message.
+#[derive(Debug, RustcEncodable)]
+struct SlashCommandResponse<'a> {
+    response_type: &'a str,
+    text: &'a str,
+    // TODO(hyena): Support attachments for fancier responses.
 }
 
 /// Represents the contents of config.toml
@@ -138,6 +148,17 @@ fn star(slack_form: Form<SlackSlashData>, worker_channel: WorkerChannel) ->
 fn main() {
     let client = Client::new();
     let child = thread::Builder::new().name("staring thread".to_string()).spawn(move || {
+        fn send_slack_response(client: &Client, url: &str, text: &str) {
+            let body = json::encode(&SlashCommandResponse {
+                response_type: "ephemeral",
+                text: &text,
+            }).unwrap();
+            match client.post(url).header(ContentType::json()).send() {
+                Ok(res) => println!("Sent response successfully."),
+                Err(e) => println!("Error sending response! {}", e),
+            };
+        }
+
         let rx = STAR_WORKER_CHANNEL.1.lock().unwrap();
         loop {
             let star_request_data = rx.recv().unwrap();
@@ -153,10 +174,22 @@ fn main() {
                     msg = history_response.messages.remove(0);
                 }
                 Err(e) => {
+                    send_slack_response(&client, &star_request_data.response_url,
+                                        "Couldn't retrieve that message.");
                     continue;// TODO: Return an error response here.
                 }
             };
+
             println!("Message: {:?}", msg);
+            match msg {
+                Message::Standard {text: Some(ref text), .. } => {
+                    send_slack_response(&client, &star_request_data.response_url,
+                        &format!("Penned \"{}\" into the book of stars.... 🐼", &text));
+                },
+                _ => send_slack_response(&client, &star_request_data.response_url,
+                                         "Unexpected message."),
+            }
+
         }
     });
     rocket::ignite().mount("/", routes![star]).launch();
