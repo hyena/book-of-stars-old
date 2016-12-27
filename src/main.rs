@@ -153,8 +153,8 @@ fn main() {
                 response_type: "ephemeral",
                 text: &text,
             }).unwrap();
-            match client.post(url).header(ContentType::json()).send() {
-                Ok(res) => println!("Sent response successfully."),
+            match client.post(url).header(ContentType::json()).body(&body).send() {
+                Ok(res) => println!("Sent response successfully."),  // TODO(hyena): More checking.
                 Err(e) => println!("Error sending response! {}", e),
             };
         }
