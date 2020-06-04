@@ -1,3 +1,6 @@
+This tool is now old and being rewritten for discord
+====================================================
+
 A bit of a hack to record stars on a slack server. Listens for a slack slash command and sends a
 star.add command in response.
 
